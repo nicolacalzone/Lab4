@@ -41,9 +41,10 @@ int main(int argc, char **argv)
 
     for (size_t i = 0; i < circles.size(); i++)
     {
-        Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
-        int radius = cvRound(circles[i][2]);
-        circle(src, center, radius, Scalar(0, 0, 255), 3);
+        Vec3i c = circles[i];
+        Point center = Point(c[0], c[1]); // c0 = x coord , c1 = y coord of the circle
+        int radius = c[2];                // c2 = ray of the circle
+        circle(src, center, radius, Scalar(0, 0, 255), 12);
     }
 
     imshow("Signal detection", src);

@@ -20,8 +20,7 @@ struct ROIregion
 /* DECLARATIONS */
 Mat colorLines(Mat src, ROIregion reg, Points pts);
 bool compareLength(Vec4i line1, Vec4i line2);
-// vector<Vec4i> findMaxLines(vector<Vec4i> lines, int numLines);
-// Mat drawRedLine(Mat img, Point p1, Point p2);
+// Mat drawRedLine(Mat src, Point p1, Point p2);
 // getPoints(vector<Vec4i> lines, Rect roi, Points *p);
 
 int main(int argc, char **argv)
@@ -42,7 +41,7 @@ int main(int argc, char **argv)
     int min_threshold = 235; // near 255 to detect only white
     threshold(grayImg, whiteMask, min_threshold, 255, THRESH_BINARY);
     GaussianBlur(whiteMask, blurImg, Size(5, 5), 0);
-    Canny(blurImg, cannyImg, 50, 150); // edges
+    Canny(blurImg, cannyImg, 50, 150, 3); // edges
 
     // TAKE ROI
     Point topLeft(460, 100);
@@ -62,32 +61,7 @@ int main(int argc, char **argv)
 
     // SORT LINES
     sort(lines.begin(), lines.end(), compareLength);
-    cout << "lenght of lines is " << lines.size() << endl;
-
-    // TAKES ALL POINTS INSIDE OF ROI REGION
-    /*  Points points;
-        getPoints(lines, roi, &points);
-
-        cout << points.points1.size() << " " << points.points2.size() << endl;
-
-        for (const Point &p : points.points1)
-            cout << "1 \t" << p << endl;
-
-        for (const Point &p : points.points2)
-            cout << "2 \t" << p << endl;
-
-        Mat srcClone = src.clone();
-        if (!points.points1.empty() && !points.points2.empty())
-        {
-            for (int i = 0; i < points.points2.size(); i++)
-            {
-                Point p1 = points.points1[i];
-                Point p2 = points.points2[i];
-                cv::line(srcClone, p1, p2, Scalar(0, 0, 255), 2);
-            }
-        }
-        imshow("clone", srcClone);
-    */
+    cout << "number of lines: " << lines.size() << endl;
 
     /* TAKES ALL POINTS FOR EVERY LINE */
     vector<Point> newPoints1;
@@ -107,11 +81,13 @@ int main(int argc, char **argv)
         }
     }
 
-    for (Point p : newPoints1)
-        cout << "1 \t" << p.x << " " << p.y << endl;
+    /*
+        for (Point p : newPoints1)
+            cout << "1 \t" << p.x << " " << p.y << endl;
 
-    for (Point p : newPoints2)
-        cout << "2 \t" << p.x << " " << p.y << endl;
+        for (Point p : newPoints2)
+            cout << "2 \t" << p.x << " " << p.y << endl;
+    */
 
     Points pts;
     pts.points1 = newPoints1;

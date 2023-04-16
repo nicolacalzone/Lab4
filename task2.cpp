@@ -49,7 +49,7 @@ int main(int argc, char **argv)
         Scalar color = Scalar(0, 0, 255);
         drawContours(src, contours, (int)i, color, 2, LINE_8, hierarchy, 0);
     }
-    imshow("Contours", src);
+    imshow("Detected White Areas", src);
 
     waitKey(0);
 
