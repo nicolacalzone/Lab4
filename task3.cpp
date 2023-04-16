@@ -5,16 +5,32 @@
 using namespace cv;
 using namespace std;
 
-vector<Vec4i> findMaxLines(vector<Vec4i> lines, int numLines);
-Mat drawRedLine(Mat img, Point p1, Point p2);
-vector<Point> getPointsInRoi(vector<Vec4i> lines, Rect roi);
+/* GLOBAL */
+struct Points
+{
+    vector<Point> points1; // points on the 1st line
+    vector<Point> points2; // points on the 2nd line
+};
+struct ROIregion
+{
+    Point topLeft;     // topleft coordinates of the ROI
+    Point bottomRight; // bottom right coordinates of the ROI
+};
+
+/* DECLARATIONS */
+Mat colorLines(Mat src, ROIregion reg, Points pts);
 bool compareLength(Vec4i line1, Vec4i line2);
+// vector<Vec4i> findMaxLines(vector<Vec4i> lines, int numLines);
+// Mat drawRedLine(Mat img, Point p1, Point p2);
+// getPoints(vector<Vec4i> lines, Rect roi, Points *p);
 
 int main(int argc, char **argv)
 {
     string path = "../street_scene.png";
     Mat src = imread(path, IMREAD_COLOR);
     Mat grayImg, whiteMask, cannyImg, blurImg;
+
+    cout << src.size();
 
     if (!src.data)
     {
@@ -23,69 +39,125 @@ int main(int argc, char **argv)
     }
 
     cvtColor(src, grayImg, COLOR_BGR2GRAY);
-    int min_threshold = 240; // near 255 to detect only white
+    int min_threshold = 235; // near 255 to detect only white
     threshold(grayImg, whiteMask, min_threshold, 255, THRESH_BINARY);
     GaussianBlur(whiteMask, blurImg, Size(5, 5), 0);
     Canny(blurImg, cannyImg, 50, 150); // edges
 
     // TAKE ROI
-    Point topLeft(460, 120);
-    Point bottomRight(800, 340);
-    Rect roi(topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
+    Point topLeft(460, 100);
+    Point bottomRight(800, 350);
+
+    ROIregion reg;
+    reg.bottomRight = bottomRight;
+    reg.topLeft = topLeft;
+
+    Rect roi(reg.topLeft.x, reg.topLeft.y, reg.bottomRight.x - reg.topLeft.x, reg.bottomRight.y - reg.topLeft.y);
     Mat result = cannyImg(roi);
+    imshow("res", result);
+
+    // HOUGH
+    vector<Vec4i> lines;
+    HoughLinesP(result, lines, 1, CV_PI / 180, 50, 50, 10);
 
     // SORT LINES
-    vector<Vec4i> lines;
     sort(lines.begin(), lines.end(), compareLength);
     cout << "lenght of lines is " << lines.size() << endl;
 
-    // HOUGH
-    HoughLinesP(cannyImg, lines, 1, CV_PI / 180, 50, 50, 10);
+    // TAKES ALL POINTS INSIDE OF ROI REGION
+    /*  Points points;
+        getPoints(lines, roi, &points);
 
-    // ROI --> arr
-    vector<Point> arr = getPointsInRoi(lines, roi);
+        cout << points.points1.size() << " " << points.points2.size() << endl;
 
-    // int linesToFind = 2;
-    // if (!lines.empty())
-    // lines = findMaxLines(lines, linesToFind);
+        for (const Point &p : points.points1)
+            cout << "1 \t" << p << endl;
 
-    if (!lines.empty()) // draws strongest lines on src
+        for (const Point &p : points.points2)
+            cout << "2 \t" << p << endl;
+
+        Mat srcClone = src.clone();
+        if (!points.points1.empty() && !points.points2.empty())
+        {
+            for (int i = 0; i < points.points2.size(); i++)
+            {
+                Point p1 = points.points1[i];
+                Point p2 = points.points2[i];
+                cv::line(srcClone, p1, p2, Scalar(0, 0, 255), 2);
+            }
+        }
+        imshow("clone", srcClone);
+    */
+
+    /* TAKES ALL POINTS FOR EVERY LINE */
+    vector<Point> newPoints1;
+    vector<Point> newPoints2;
+    for (int i = 2; i < 4; i++)
     {
-        /* for (auto line : lines)
+        auto line = lines[i];
+        Point p1(line[0], line[1]);
+        Point p2(line[2], line[3]);
+        LineIterator iter(src, p1, p2);
+        for (int j = 0; j < iter.count; j++, ++iter)
         {
-            cv::line(src,
-                     Point(line[0], line[1]),
-                     Point(line[2], line[3]),
-                     Scalar(0, 0, 255),
-                     2);
-        } */
-
-        for (int i = 0; i < 2 && i < lines.size(); i++)
-        {
-            Vec4i line = lines[i];
-            cv::line(src,
-                     Point(line[0], line[1]),
-                     Point(line[2], line[3]),
-                     Scalar(0, 0, 255),
-                     2);
+            if (i % 2 == 0)
+                newPoints1.push_back(iter.pos());
+            else
+                newPoints2.push_back(iter.pos());
         }
     }
 
-    // DRAW EVERY ROW
-    for (int i = 0; i < 2 && i < lines.size(); i++)
-    {
-        auto line = lines[i];
-        arr.push_back(Point(line[0], line[1]));
-        arr.push_back(Point(line[2], line[3]));
-    }
+    for (Point p : newPoints1)
+        cout << "1 \t" << p.x << " " << p.y << endl;
 
-    for (int i = 0; i < arr.size(); i += 2)
-        src = drawRedLine(src, arr[i], arr[i + 1]);
+    for (Point p : newPoints2)
+        cout << "2 \t" << p.x << " " << p.y << endl;
+
+    Points pts;
+    pts.points1 = newPoints1;
+    pts.points2 = newPoints2;
+
+    src = colorLines(src, reg, pts);
 
     imshow("Result", src);
     waitKey(0);
 
     return 0;
+}
+
+Mat colorLines(Mat src, ROIregion reg, Points pts)
+{
+    for (Point &p1 : pts.points1)
+    {
+        Point closestPoint;
+
+        float dx = reg.bottomRight.x - reg.topLeft.x;
+        float dy = reg.bottomRight.y - reg.topLeft.y;
+        int maxDistanceROI = ceil(sqrt(dx * dx + dy * dy)); // Compute max distance in ROI
+
+        int minDistance = maxDistanceROI; // set minDistance to Max
+
+        for (Point &p2 : pts.points2)
+        {
+            if (p1.y == p2.y)
+            {
+                int distance = abs(p1.x - p2.x);
+                if (distance < minDistance)
+                {
+                    minDistance = distance; // if distance is better, change!
+                    closestPoint = p2;      // + new closest point!
+                }
+            }
+        }
+        // if for loops ended with different min distance...
+        if (minDistance != maxDistanceROI)
+        {
+            Point fixedP1(p1.x + reg.topLeft.x, p1.y + reg.topLeft.y);                               // adjusted P1
+            Point fixedClosestPoint(closestPoint.x + reg.topLeft.x, closestPoint.y + reg.topLeft.y); // adjusted Closest Point
+            cv::line(src, fixedP1, fixedClosestPoint, Scalar(0, 0, 255), 3);
+        }
+    }
+    return src;
 }
 
 bool compareLength(Vec4i line1, Vec4i line2)
@@ -95,34 +167,13 @@ bool compareLength(Vec4i line1, Vec4i line2)
     return length1 > length2;
 }
 
-vector<Point> getPointsInRoi(vector<Vec4i> lines, Rect roi)
-{
-    vector<Point> arr;
-    for (auto line : lines)
-    {
-        Point p1(line[0], line[1]);
-        Point p2(line[2], line[3]);
-        if (roi.contains(p1))
-        {
-            arr.push_back(p1);
-        }
-        if (roi.contains(p2))
-        {
-            arr.push_back(p2);
-        }
-    }
-    return arr;
-}
-
+/*
 Mat drawRedLine(Mat img, Point p1, Point p2)
 {
     Mat res = img.clone();
 
     if (p1.y != p2.y) // if points are on same y cord
-    {
         cout << "Error: Points are not on the same row" << endl;
-        return res;
-    }
 
     if (p1.x > p2.x) // if p1 is on the left of p2
         swap(p1, p2);
@@ -132,3 +183,30 @@ Mat drawRedLine(Mat img, Point p1, Point p2)
 
     return res;
 }
+
+void getPoints(vector<Vec4i> lines, Rect roi, Points *points)
+{
+    for (int i = 0; i < lines.size(); i++)
+    {
+        auto line = lines[i];
+        Point p1(line[0], line[1]);
+        Point p2(line[2], line[3]);
+        if (roi.contains(p1))
+        {
+            if (i % 2 == 0)
+                points->points1.push_back(p1);
+            else
+                points->points1.push_back(p1);
+        }
+        if (roi.contains(p2))
+        {
+            if (i % 2 == 0)
+                points->points1.push_back(p2);
+            else
+                points->points1.push_back(p2);
+        }
+    }
+}
+
+
+*/
