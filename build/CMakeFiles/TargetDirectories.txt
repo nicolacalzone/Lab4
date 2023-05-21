@@ -1,3 +1,0 @@
-/home/nicola/opencv/Lab4/build/CMakeFiles/rebuild_cache.dir
-/home/nicola/opencv/Lab4/build/CMakeFiles/Lab4.dir
-/home/nicola/opencv/Lab4/build/CMakeFiles/edit_cache.dir

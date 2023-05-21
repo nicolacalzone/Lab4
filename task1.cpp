@@ -26,11 +26,11 @@ static void CannyThreshold(int pos, void *user)
 // MAIN
 int main(int argc, char **argv)
 {
-    struct userdata
-    {
-        int th;
-    } data;
-
+    /*   struct userdata
+     {
+         int th;
+     } data;
+ */
     src = imread("../street_scene.png", IMREAD_COLOR);
     dst.create(src.size(), src.type());
 
